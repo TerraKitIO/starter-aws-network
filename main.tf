@@ -1,3 +1,6 @@
+# Declare the data source
+data "aws_availability_zones" "main" {}
+
 resource "aws_vpc" "main" {
   cidr_block = "10.${var.vpc_cidr_second_octet}.0.0/16"
   enable_dns_hostnames = true
@@ -52,34 +55,38 @@ resource "aws_vpc_endpoint" "s3" {
 resource "aws_subnet" "public" {
   # Public subnets are subnets that are publicly routable and addressable.  Most
   # starter kit users will leverage these the most.
-  count = 3
+  count = "${var.num_azs}"
   vpc_id = "${aws_vpc.main.id}"
-  cidr_block = "10.${var.vpc_cidr_second_octet}.${lookup(var.public_cidr_third_octet, lookup(var.az, count.index))}.0/24"
-  availability_zone = "${lookup(var.az, count.index)}"
+  cidr_block = "10.${var.vpc_cidr_second_octet}.${(count.index * 10) + var.public_cidr_third_octet}.0/24"
+  availability_zone = "${data.aws_availability_zones.main.names[count.index]}"
   map_public_ip_on_launch = true
 
   tags {
-    Name = "${var.name}-public-${lookup(var.az, count.index)}-subnet"
+    Name = "${var.name}-public-${data.aws_availability_zones.main.names[count.index]}-subnet"
     Type = "public"
+    Env  = "${var.name}"
   }
+
   depends_on = ["aws_main_route_table_association.main"]
 }
 
 resource "aws_subnet" "private" {
-  # Private subnets are not publicly addressable or routable.  Servers launched
-  # in these subnets will need a NAT server in order to reach the internet.
-  # (note: this starter kit does not include NAT servers.)
-  count = 3
+  # Private subnets are not internet addressable or routable.
+  count = "${var.num_azs}"
   vpc_id = "${aws_vpc.main.id}"
-  cidr_block = "10.${var.vpc_cidr_second_octet}.${lookup(var.private_cidr_third_octet, lookup(var.az, count.index))}.0/24"
-  availability_zone = "${lookup(var.az, count.index)}"
+  cidr_block = "10.${var.vpc_cidr_second_octet}.${(count.index * 10) + var.private_cidr_third_octet}.0/24"
+  availability_zone = "${data.aws_availability_zones.main.names[count.index]}"
   map_public_ip_on_launch = false
 
   tags {
-    Name = "${var.name}-private-${lookup(var.az, count.index)}-subnet"
-    Type = "private"
+    Name = "${var.name}-public-${data.aws_availability_zones.main.names[count.index]}-subnet"
+    Type = "public"
+    Env  = "${var.name}"
   }
+
+  depends_on = ["aws_main_route_table_association.main"]
 }
+
 
 ## Subnet Groups
 
@@ -90,6 +97,7 @@ resource "aws_db_subnet_group" "main" {
   subnet_ids = ["${aws_subnet.public.*.id}"]
   tags {
     Name = "${var.name}-db-subnet-group"
+    Env  = "${var.name}"
   }
 }
 
