@@ -79,7 +79,7 @@ resource "aws_subnet" "private" {
   map_public_ip_on_launch = false
 
   tags {
-    Name = "${var.name}-public-${data.aws_availability_zones.main.names[count.index]}-subnet"
+    Name = "${var.name}-private-${data.aws_availability_zones.main.names[count.index]}-subnet"
     Type = "public"
     Env  = "${var.name}"
   }
